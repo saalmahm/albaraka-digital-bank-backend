@@ -38,4 +38,23 @@ public class JwtService {
                 .signWith(signingKey, SignatureAlgorithm.HS256) // signature HS256
                 .compact();                             // générer le token final
     }
+    public String extractUsername(String token) {
+        return extractClaim(token, Claims::getSubject);
+    }
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        String username = extractUsername(token);
+        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+    }
+    private boolean isTokenExpired(String token) {
+        Date expiration = extractClaim(token, Claims::getExpiration);
+        return expiration.before(new Date());
+    }
+    private <T> T extractClaim(String token, Function<Claims, T> resolver) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(signingKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return resolver.apply(claims);
+    }
 }
