@@ -8,6 +8,8 @@ import com.albaraka.digital.model.enums.OperationType;
 import com.albaraka.digital.repository.AccountRepository;
 import com.albaraka.digital.repository.OperationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -102,5 +104,58 @@ public class OperationService {
 
         // NE PAS toucher aux soldes ici
         return operationRepository.save(operation);
+    }
+
+        // =========================
+    //      PARTIE AGENT
+    // =========================
+    public Page<Operation> listPendingOperations(Pageable pageable) {
+      return operationRepository.findByStatus(OperationStatus.PENDING, pageable);
+    }
+    @Transactional
+    public Operation approveOperation(Long operationId) {
+        Operation op = operationRepository.findById(operationId)
+                .orElseThrow(() -> new IllegalArgumentException("Opération introuvable"));
+        if (op.getStatus() != OperationStatus.PENDING) {
+            throw new IllegalArgumentException("Seules les opérations PENDING peuvent être approuvées");
+        }
+        Account source = op.getAccountSource();
+        Account destination = op.getAccountDestination();
+        BigDecimal amount = op.getAmount();
+        OperationType type = op.getType();
+        // Mise à jour des soldes comme pour les opérations <= 10 000
+        switch (type) {
+            case DEPOSIT -> source.setBalance(source.getBalance().add(amount));
+            case WITHDRAWAL -> source.setBalance(source.getBalance().subtract(amount));
+            case TRANSFER -> {
+                source.setBalance(source.getBalance().subtract(amount));
+                if (destination == null) {
+                    throw new IllegalStateException("Compte destinataire manquant pour un virement");
+                }
+                destination.setBalance(destination.getBalance().add(amount));
+                accountRepository.save(destination);
+            }
+        }
+        accountRepository.save(source);
+        op.setStatus(OperationStatus.VALIDATED);
+        LocalDateTime now = LocalDateTime.now();
+        if (op.getExecutedAt() == null) {
+            op.setExecutedAt(now);
+        }
+        op.setValidatedAt(now);
+        return operationRepository.save(op);
+    }
+    @Transactional
+    public Operation rejectOperation(Long operationId) {
+        Operation op = operationRepository.findById(operationId)
+                .orElseThrow(() -> new IllegalArgumentException("Opération introuvable"));
+        if (op.getStatus() != OperationStatus.PENDING) {
+            throw new IllegalArgumentException("Seules les opérations PENDING peuvent être rejetées");
+        }
+        op.setStatus(OperationStatus.REJECTED);
+        // Option : historiser aussi la date de décision
+        op.setValidatedAt(LocalDateTime.now());
+        // Pas de modification de solde
+        return operationRepository.save(op);
     }
 }
