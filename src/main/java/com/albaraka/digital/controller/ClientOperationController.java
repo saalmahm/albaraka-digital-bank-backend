@@ -7,9 +7,14 @@ import com.albaraka.digital.service.OperationService;
 import com.albaraka.digital.service.OperationQueryService;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.RequestParam;
+import com.albaraka.digital.service.DocumentService;
+import com.albaraka.digital.model.entity.Document;
+import org.springframework.web.multipart.MultipartFile;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/client/operations")
@@ -18,6 +23,7 @@ public class ClientOperationController {
 
     private final OperationService operationService;
     private final OperationQueryService operationQueryService;
+    private final DocumentService documentService;
 
     @PostMapping
     public OperationResponse createOperation(@Valid @RequestBody OperationRequest request) {
@@ -39,5 +45,14 @@ public class ClientOperationController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         return operationQueryService.getCurrentClientOperations(page, size);
+    }
+
+    @PostMapping("/{id}/document")
+    public String uploadJustificatif(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file) throws IOException {
+
+        Document doc = documentService.uploadJustificatif(id, file);
+        return "Justificatif uploadé avec succès (id=" + doc.getId() + ")";
     }
 }
