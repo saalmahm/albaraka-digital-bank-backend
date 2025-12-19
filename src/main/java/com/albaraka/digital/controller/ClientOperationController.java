@@ -4,6 +4,9 @@ import com.albaraka.digital.dto.operation.OperationRequest;
 import com.albaraka.digital.dto.operation.OperationResponse;
 import com.albaraka.digital.model.entity.Operation;
 import com.albaraka.digital.service.OperationService;
+import com.albaraka.digital.service.OperationQueryService;
+import org.springframework.data.domain.Page;
+import org.springframework.web.bind.annotation.RequestParam;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class ClientOperationController {
 
     private final OperationService operationService;
+    private final OperationQueryService operationQueryService;
 
     @PostMapping
     public OperationResponse createOperation(@Valid @RequestBody OperationRequest request) {
@@ -28,5 +32,12 @@ public class ClientOperationController {
                 op.getAccountSource().getAccountNumber(),
                 op.getAccountDestination() != null ? op.getAccountDestination().getAccountNumber() : null
         );
+    }
+
+    @GetMapping
+    public Page<OperationResponse> getOperations(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return operationQueryService.getCurrentClientOperations(page, size);
     }
 }
