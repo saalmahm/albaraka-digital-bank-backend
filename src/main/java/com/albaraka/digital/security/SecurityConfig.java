@@ -41,11 +41,12 @@ public class SecurityConfig {
                 .sessionManagement(sm ->
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/api/client/**").hasRole("CLIENT")
-                        .requestMatchers("/api/agent/**").hasRole("AGENT_BANCAIRE")
-                        .anyRequest().authenticated()
-                )
+                .requestMatchers("/auth/**").permitAll()
+                .requestMatchers("/api/client/**").hasRole("CLIENT")
+                .requestMatchers("/api/agent/**").hasRole("AGENT_BANCAIRE")
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .anyRequest().authenticated()
+        )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler)
