@@ -25,56 +25,47 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     /**
      * Méthode exécutée pour chaque requête HTTP
      */
+
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain) throws ServletException, IOException {
+protected void doFilterInternal(
+        HttpServletRequest request,
+        HttpServletResponse response,
+        FilterChain filterChain) throws ServletException, IOException {
 
-        // Récupère le header Authorization
-        // "Authorization: Bearer <token>"
-        String authHeader = request.getHeader("Authorization");
+    String authHeader = request.getHeader("Authorization");
+    System.out.println(">>> JwtFilter URL=" + request.getRequestURI() + " Authorization=" + authHeader);
 
-        // Si pas de header ou ne commence pas par "Bearer ", passer la requête au filtre suivant
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        filterChain.doFilter(request, response);
+        return;
+    }
 
-        // Récupération du token (on enlève "Bearer ")
-        String token = authHeader.substring(7);
+    String token = authHeader.substring(7);
 
-        // Extraction du username (email) depuis le token
+    try {
         String username = jwtService.extractUsername(token);
+        System.out.println(">>> JwtFilter username=" + username);
 
-        // Vérifie si l'utilisateur n'est pas déjà authentifié dans le contexte Spring
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
-            // Récupère l'utilisateur depuis la DB
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-            // Vérifie si le token est valide (correspond à l'utilisateur et non expiré)
             if (jwtService.isTokenValid(token, userDetails)) {
-
-                // Crée un objet Authentication pour Spring Security
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails,
                                 null,
-                                userDetails.getAuthorities() // Roles/Authorities
+                                userDetails.getAuthorities()
                         );
-
-                // Ajoute les détails de la requête (IP, session, etc.)
                 authToken.setDetails(
                         new WebAuthenticationDetailsSource().buildDetails(request)
                 );
-
-                // Place l'utilisateur authentifié dans le contexte Spring
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
-
-        // Passe la requête au prochain filtre dans la chaîne
-        filterChain.doFilter(request, response);
+    } catch (Exception e) {
+        e.printStackTrace(); // logge la vraie erreur JWT
     }
+
+    filterChain.doFilter(request, response);
+}
 }
