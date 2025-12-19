@@ -36,6 +36,8 @@ public class Operation {
 
     private LocalDateTime executedAt;
 
+    private LocalDateTime validatedAt;
+
     @ManyToOne(optional = false)
     @JoinColumn(name = "account_source_id")
     private Account accountSource;
