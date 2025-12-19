@@ -2,11 +2,13 @@ package com.albaraka.digital.service;
 
 import com.albaraka.digital.dto.admin.AdminCreateUserRequest;
 import com.albaraka.digital.dto.admin.AdminCreateUserResponse;
+import com.albaraka.digital.dto.admin.AdminUpdateUserStatusRequest;
 import com.albaraka.digital.model.entity.Account;
 import com.albaraka.digital.model.entity.User;
 import com.albaraka.digital.model.enums.UserRole;
 import com.albaraka.digital.repository.AccountRepository;
 import com.albaraka.digital.repository.UserRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -63,6 +65,24 @@ public class AdminUserService {
                 savedUser.getRole(),
                 savedUser.isActive(),
                 accountNumber
+        );
+    }
+
+    @Transactional
+    public AdminCreateUserResponse updateUserStatus(Long userId, AdminUpdateUserStatusRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
+
+        user.setActive(Boolean.TRUE.equals(request.getActive()));
+        User saved = userRepository.save(user);
+
+        return new AdminCreateUserResponse(
+                saved.getId(),
+                saved.getEmail(),
+                saved.getFullName(),
+                saved.getRole(),
+                saved.isActive(),
+                null 
         );
     }
 }
