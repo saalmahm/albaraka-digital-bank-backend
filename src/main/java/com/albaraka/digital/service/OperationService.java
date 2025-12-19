@@ -1,32 +1,56 @@
-@Transactional
-public Operation createClientOperation(OperationRequest request) {
+package com.albaraka.digital.service;
 
-    Account source = accountService.getCurrentUserAccount();
+import com.albaraka.digital.dto.operation.OperationRequest;
+import com.albaraka.digital.model.entity.Account;
+import com.albaraka.digital.model.entity.Operation;
+import com.albaraka.digital.model.enums.OperationStatus;
+import com.albaraka.digital.model.enums.OperationType;
+import com.albaraka.digital.repository.AccountRepository;
+import com.albaraka.digital.repository.OperationRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-    BigDecimal amount = request.getAmount();
-    if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-        throw new IllegalArgumentException("Le montant doit être strictement positif");
-    }
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
-    OperationType type = request.getType();
+@Service
+@RequiredArgsConstructor
+public class OperationService {
 
-    Account destination = null;
-    if (type == OperationType.TRANSFER) {
-        if (request.getDestinationAccountNumber() == null || request.getDestinationAccountNumber().isBlank()) {
-            throw new IllegalArgumentException("Le numéro de compte destinataire est obligatoire pour un virement");
+    private static final BigDecimal THRESHOLD = BigDecimal.valueOf(10_000);
+
+    private final AccountService accountService;
+    private final AccountRepository accountRepository;
+    private final OperationRepository operationRepository;
+
+    @Transactional
+    public Operation createClientOperation(OperationRequest request) {
+
+        Account source = accountService.getCurrentUserAccount();
+
+        BigDecimal amount = request.getAmount();
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Le montant doit être strictement positif");
         }
-        destination = accountRepository.findByAccountNumber(request.getDestinationAccountNumber())
-                .orElseThrow(() -> new IllegalArgumentException("Compte destinataire introuvable"));
 
-        if (destination.getId().equals(source.getId())) {
-            throw new IllegalArgumentException("Le compte source et le compte destinataire doivent être différents");
+        OperationType type = request.getType();
+
+        Account destination = null;
+        if (type == OperationType.TRANSFER) {
+            if (request.getDestinationAccountNumber() == null || request.getDestinationAccountNumber().isBlank()) {
+                throw new IllegalArgumentException("Le numéro de compte destinataire est obligatoire pour un virement");
+            }
+            destination = accountRepository.findByAccountNumber(request.getDestinationAccountNumber())
+                    .orElseThrow(() -> new IllegalArgumentException("Compte destinataire introuvable"));
+            if (destination.getId().equals(source.getId())) {
+                throw new IllegalArgumentException("Le compte source et le compte destinataire doivent être différents");
+            }
         }
-    }
 
-    /* 
-       CAS A : montant ≤ 10 000
-      */
-    if (amount.compareTo(THRESHOLD) <= 0) {
+        if (amount.compareTo(THRESHOLD) > 0) {
+            throw new IllegalArgumentException("Cette méthode gère uniquement les montants ≤ 10 000 DH");
+        }
 
         // Vérifier solde suffisant pour retraits et virements
         if (type == OperationType.WITHDRAWAL || type == OperationType.TRANSFER) {
@@ -59,18 +83,4 @@ public Operation createClientOperation(OperationRequest request) {
         accountRepository.save(source);
         return operationRepository.save(operation);
     }
-
-    /*
-       CAS B : montant > 10 000
-     */
-    Operation operation = Operation.builder()
-            .type(type)
-            .amount(amount)
-            .status(OperationStatus.PENDING)
-            .accountSource(source)
-            .accountDestination(destination)
-            .createdAt(LocalDateTime.now())
-            .build();
-
-    return operationRepository.save(operation);
 }
