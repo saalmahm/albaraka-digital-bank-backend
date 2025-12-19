@@ -30,26 +30,29 @@ public class OperationService {
         Account source = accountService.getCurrentUserAccount();
 
         BigDecimal amount = request.getAmount();
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Le montant doit être strictement positif");
         }
 
         OperationType type = request.getType();
+        if (type == null) {
+            throw new IllegalArgumentException("Le type d'opération est obligatoire");
+        }
 
+        // Gestion du compte destinataire pour les virements
         Account destination = null;
         if (type == OperationType.TRANSFER) {
-            if (request.getDestinationAccountNumber() == null || request.getDestinationAccountNumber().isBlank()) {
+            if (request.getDestinationAccountNumber() == null
+                    || request.getDestinationAccountNumber().isBlank()) {
                 throw new IllegalArgumentException("Le numéro de compte destinataire est obligatoire pour un virement");
             }
+
             destination = accountRepository.findByAccountNumber(request.getDestinationAccountNumber())
                     .orElseThrow(() -> new IllegalArgumentException("Compte destinataire introuvable"));
+
             if (destination.getId().equals(source.getId())) {
                 throw new IllegalArgumentException("Le compte source et le compte destinataire doivent être différents");
             }
-        }
-
-        if (amount.compareTo(THRESHOLD) > 0) {
-            throw new IllegalArgumentException("Cette méthode gère uniquement les montants ≤ 10 000 DH");
         }
 
         // Vérifier solde suffisant pour retraits et virements
@@ -59,28 +62,45 @@ public class OperationService {
             }
         }
 
+        // CAS A : montant ≤ 10 000 DH -> VALIDATED + mise à jour immédiate des soldes
+        if (amount.compareTo(THRESHOLD) <= 0) {
+
+            Operation operation = Operation.builder()
+                    .type(type)
+                    .amount(amount)
+                    .status(OperationStatus.VALIDATED)
+                    .accountSource(source)
+                    .accountDestination(destination)
+                    .createdAt(LocalDateTime.now())
+                    .executedAt(LocalDateTime.now())
+                    .build();
+
+            // Mise à jour des soldes
+            switch (type) {
+                case DEPOSIT -> source.setBalance(source.getBalance().add(amount));
+                case WITHDRAWAL -> source.setBalance(source.getBalance().subtract(amount));
+                case TRANSFER -> {
+                    source.setBalance(source.getBalance().subtract(amount));
+                    destination.setBalance(destination.getBalance().add(amount));
+                    accountRepository.save(destination);
+                }
+            }
+
+            accountRepository.save(source);
+            return operationRepository.save(operation);
+        }
+
+        // CAS B : montant > 10 000 DH -> PENDING, pas de modification de solde
         Operation operation = Operation.builder()
                 .type(type)
                 .amount(amount)
-                .status(OperationStatus.VALIDATED)
+                .status(OperationStatus.PENDING)
                 .accountSource(source)
                 .accountDestination(destination)
                 .createdAt(LocalDateTime.now())
-                .executedAt(LocalDateTime.now())
                 .build();
 
-        // Mise à jour des soldes
-        switch (type) {
-            case DEPOSIT -> source.setBalance(source.getBalance().add(amount));
-            case WITHDRAWAL -> source.setBalance(source.getBalance().subtract(amount));
-            case TRANSFER -> {
-                source.setBalance(source.getBalance().subtract(amount));
-                destination.setBalance(destination.getBalance().add(amount));
-                accountRepository.save(destination);
-            }
-        }
-
-        accountRepository.save(source);
+        // NE PAS toucher aux soldes ici
         return operationRepository.save(operation);
     }
 }
