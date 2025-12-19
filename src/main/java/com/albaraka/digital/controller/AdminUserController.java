@@ -2,6 +2,7 @@ package com.albaraka.digital.controller;
 
 import com.albaraka.digital.dto.admin.AdminCreateUserRequest;
 import com.albaraka.digital.dto.admin.AdminCreateUserResponse;
+import com.albaraka.digital.dto.admin.AdminUpdateUserStatusRequest;
 import com.albaraka.digital.service.AdminUserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,5 +18,13 @@ public class AdminUserController {
     @PostMapping
     public AdminCreateUserResponse createUser(@Valid @RequestBody AdminCreateUserRequest request) {
         return adminUserService.createUser(request);
+    }
+
+    @PutMapping("/{id}/status")
+    public AdminCreateUserResponse updateStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody AdminUpdateUserStatusRequest request
+    ) {
+        return adminUserService.updateUserStatus(id, request);
     }
 }
