@@ -114,4 +114,17 @@ public class AdminUserService {
                 user.getCreatedAt()
         );
     }
+
+    @Transactional
+    public void deactivateUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
+
+        if (!user.isActive()) {
+            return; 
+        }
+
+        user.setActive(false);
+        userRepository.save(user);
+    }
 }
