@@ -8,10 +8,13 @@ import com.albaraka.digital.model.entity.User;
 import com.albaraka.digital.model.enums.UserRole;
 import com.albaraka.digital.repository.AccountRepository;
 import com.albaraka.digital.repository.UserRepository;
+import com.albaraka.digital.dto.admin.AdminUserSummary;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 
@@ -83,6 +86,32 @@ public class AdminUserService {
                 saved.getRole(),
                 saved.isActive(),
                 null 
+        );
+    }
+
+        public Page<AdminUserSummary> listUsers(Pageable pageable) {
+        return userRepository.findAll(pageable)
+                .map(user -> new AdminUserSummary(
+                        user.getId(),
+                        user.getEmail(),
+                        user.getFullName(),
+                        user.getRole(),
+                        user.isActive(),
+                        user.getCreatedAt()
+                ));
+    }
+
+    public AdminUserSummary getUserById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
+
+        return new AdminUserSummary(
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getRole(),
+                user.isActive(),
+                user.getCreatedAt()
         );
     }
 }
