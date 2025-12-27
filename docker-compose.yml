@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: albaraka-db
+    environment:
+      POSTGRES_DB: albaraka_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-salmahm}
+    ports:
+      - "5432:5432"
+    volumes:
+      - albaraka_pgdata:/var/lib/postgresql/data
+    networks:
+      - albaraka-net
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: albaraka-backend
+    depends_on:
+      - db
+    environment:
+      # DB
+      DB_URL: jdbc:postgresql://db:5432/albaraka_db
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-salmahm}
+      # JWT
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_USE_A_LONG_RANDOM_SECRET_KEY}
+      # Spring profile
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8080:8080"
+    networks:
+      - albaraka-net
+
+networks:
+  albaraka-net:
+
+volumes:
+  albaraka_pgdata:
