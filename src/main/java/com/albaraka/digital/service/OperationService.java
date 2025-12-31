@@ -16,9 +16,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Service
-@RequiredArgsConstructor
-public class OperationService {
+import lombok.extern.slf4j.Slf4j;
+
+    @Service
+    @RequiredArgsConstructor
+    @Slf4j
+    public class OperationService {
 
     private static final BigDecimal THRESHOLD = BigDecimal.valueOf(10_000);
 
@@ -143,6 +146,22 @@ public class OperationService {
             op.setExecutedAt(now);
         }
         op.setValidatedAt(now);
+                // Log métier : comparaison IA vs décision agent (APPROVE)
+        log.info(
+                "AGENT_DECISION - operationId={}, finalDecision=APPROVE, aiDecision={}, aiComment={}",
+                op.getId(),
+                op.getAiDecision(),
+                op.getAiComment()
+        );
+
+                // Log métier : comparaison IA vs décision agent (APPROVE)
+        log.info(
+                "AGENT_DECISION - operationId={}, finalDecision=APPROVE, aiDecision={}, aiComment={}",
+                op.getId(),
+                op.getAiDecision(),
+                op.getAiComment()
+        );
+
         return operationRepository.save(op);
     }
     @Transactional
