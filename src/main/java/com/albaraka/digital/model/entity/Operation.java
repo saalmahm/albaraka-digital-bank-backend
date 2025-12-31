@@ -2,6 +2,7 @@ package com.albaraka.digital.model.entity;
 
 import com.albaraka.digital.model.enums.OperationStatus;
 import com.albaraka.digital.model.enums.OperationType;
+import com.albaraka.digital.model.enums.AiDecision;  
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -45,6 +46,12 @@ public class Operation {
     @ManyToOne
     @JoinColumn(name = "account_destination_id")
     private Account accountDestination;
+
+    // ==== Champs IA pour la validation intelligente ====
+    @Enumerated(EnumType.STRING)
+    private AiDecision aiDecision;
+    private String aiComment;
+    private LocalDateTime aiEvaluatedAt;
 
     @PrePersist
     public void prePersist() {
