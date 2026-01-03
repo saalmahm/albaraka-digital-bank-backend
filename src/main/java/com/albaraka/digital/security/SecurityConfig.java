@@ -18,6 +18,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 
 @Configuration
 @RequiredArgsConstructor
@@ -74,10 +75,11 @@ public class SecurityConfig {
      * - Pour toutes les autres routes
      * - Utilise JwtAuthenticationFilter + rôles (CLIENT, AGENT_BANCAIRE, ADMIN)
      */
-    @Bean
-    @Order(2)
-    public SecurityFilterChain jwtFilterChain(HttpSecurity http) throws Exception {
+        @Bean
+        @Order(2)
+        public SecurityFilterChain jwtFilterChain(HttpSecurity http) throws Exception {
         http
+                .securityMatcher("/auth/**", "/api/**")   // 🔴 AJOUT
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm ->
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -95,7 +97,44 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
-    }
+        }
+        @Bean
+        @Order(3)
+        public SecurityFilterChain uiFilterChain(HttpSecurity http) throws Exception {
+        http
+                // Cette chaîne s’applique aux routes UI (non /api/**)
+                .securityMatcher("/login", "/post-login", "/client/**", "/agent/**", "/admin/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/login").permitAll()
+                        // /post-login nécessite un utilisateur déjà authentifié
+                        .requestMatchers("/client/**").hasRole("CLIENT")
+                        .requestMatchers("/agent/**").hasRole("AGENT_BANCAIRE")
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated()
+                )
+                .formLogin(form -> form
+                        .loginPage("/login")
+                        .loginProcessingUrl("/login")
+                        .defaultSuccessUrl("/post-login", true)
+                        .failureUrl("/login?error=true")
+                        .permitAll()
+                )
+                .rememberMe(rm -> rm
+                        .key("change-remember-me-key")
+                        .rememberMeParameter("remember-me")
+                        .tokenValiditySeconds(7 * 24 * 60 * 60)
+                )
+                .exceptionHandling(ex -> ex
+                        .accessDeniedPage("/access-denied")
+                )
+                .logout(logout -> logout
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/login?logout=true")
+                );
+
+        return http.build();
+        }
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
