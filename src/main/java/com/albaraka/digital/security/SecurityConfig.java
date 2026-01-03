@@ -98,15 +98,16 @@ public class SecurityConfig {
 
         return http.build();
         }
+        
         @Bean
         @Order(3)
         public SecurityFilterChain uiFilterChain(HttpSecurity http) throws Exception {
         http
                 // Cette chaîne s’applique aux routes UI (non /api/**)
-                .securityMatcher("/login", "/post-login", "/client/**", "/agent/**", "/admin/**")
+                .securityMatcher("/login", "/logout", "/post-login", "/client/**", "/agent/**", "/admin/**")
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login").permitAll()
+                        .requestMatchers("/login", "/logout").permitAll()
                         // /post-login nécessite un utilisateur déjà authentifié
                         .requestMatchers("/client/**").hasRole("CLIENT")
                         .requestMatchers("/agent/**").hasRole("AGENT_BANCAIRE")
