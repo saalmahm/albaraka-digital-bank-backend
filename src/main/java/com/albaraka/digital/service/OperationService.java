@@ -8,6 +8,7 @@ import com.albaraka.digital.model.enums.OperationType;
 import com.albaraka.digital.repository.AccountRepository;
 import com.albaraka.digital.repository.OperationRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -16,12 +17,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-import lombok.extern.slf4j.Slf4j;
-
-    @Service
-    @RequiredArgsConstructor
-    @Slf4j
-    public class OperationService {
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class OperationService {
 
     private static final BigDecimal THRESHOLD = BigDecimal.valueOf(10_000);
 
@@ -109,24 +108,35 @@ import lombok.extern.slf4j.Slf4j;
         return operationRepository.save(operation);
     }
 
-        // =========================
+    // =========================
     //      PARTIE AGENT
     // =========================
+
     public Page<Operation> listPendingOperations(Pageable pageable) {
-      return operationRepository.findByStatus(OperationStatus.PENDING, pageable);
+        return operationRepository.findByStatus(OperationStatus.PENDING, pageable);
     }
+
     @Transactional
     public Operation approveOperation(Long operationId) {
         Operation op = operationRepository.findById(operationId)
                 .orElseThrow(() -> new IllegalArgumentException("Opération introuvable"));
+
         if (op.getStatus() != OperationStatus.PENDING) {
             throw new IllegalArgumentException("Seules les opérations PENDING peuvent être approuvées");
         }
+
         Account source = op.getAccountSource();
         Account destination = op.getAccountDestination();
         BigDecimal amount = op.getAmount();
         OperationType type = op.getType();
-        // Mise à jour des soldes comme pour les opérations <= 10 000
+
+        // Vérifier solde suffisant au moment de la validation pour retrait / virement
+        if ((type == OperationType.WITHDRAWAL || type == OperationType.TRANSFER)
+                && source.getBalance().compareTo(amount) < 0) {
+            throw new IllegalStateException("Solde insuffisant au moment de la validation");
+        }
+
+        // Mise à jour des soldes comme pour les opérations ≤ 10 000
         switch (type) {
             case DEPOSIT -> source.setBalance(source.getBalance().add(amount));
             case WITHDRAWAL -> source.setBalance(source.getBalance().subtract(amount));
@@ -139,6 +149,7 @@ import lombok.extern.slf4j.Slf4j;
                 accountRepository.save(destination);
             }
         }
+
         accountRepository.save(source);
         op.setStatus(OperationStatus.VALIDATED);
         LocalDateTime now = LocalDateTime.now();
@@ -146,15 +157,8 @@ import lombok.extern.slf4j.Slf4j;
             op.setExecutedAt(now);
         }
         op.setValidatedAt(now);
-                // Log métier : comparaison IA vs décision agent (APPROVE)
-        log.info(
-                "AGENT_DECISION - operationId={}, finalDecision=APPROVE, aiDecision={}, aiComment={}",
-                op.getId(),
-                op.getAiDecision(),
-                op.getAiComment()
-        );
 
-                // Log métier : comparaison IA vs décision agent (APPROVE)
+        // Log métier : comparaison IA vs décision agent (APPROVE)
         log.info(
                 "AGENT_DECISION - operationId={}, finalDecision=APPROVE, aiDecision={}, aiComment={}",
                 op.getId(),
@@ -164,17 +168,29 @@ import lombok.extern.slf4j.Slf4j;
 
         return operationRepository.save(op);
     }
+
     @Transactional
     public Operation rejectOperation(Long operationId) {
         Operation op = operationRepository.findById(operationId)
                 .orElseThrow(() -> new IllegalArgumentException("Opération introuvable"));
+
         if (op.getStatus() != OperationStatus.PENDING) {
             throw new IllegalArgumentException("Seules les opérations PENDING peuvent être rejetées");
         }
+
         op.setStatus(OperationStatus.REJECTED);
         // Option : historiser aussi la date de décision
         op.setValidatedAt(LocalDateTime.now());
         // Pas de modification de solde
+
+        // Log métier : comparaison IA vs décision agent (REJECT)
+        log.info(
+                "AGENT_DECISION - operationId={}, finalDecision=REJECT, aiDecision={}, aiComment={}",
+                op.getId(),
+                op.getAiDecision(),
+                op.getAiComment()
+        );
+
         return operationRepository.save(op);
     }
 }
