@@ -1,0 +1,28 @@
+name: CD Docker
+
+on:
+  push:
+    branches: [ master ]   # CD seulement quand on pousse sur master
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            salmahamdi/albaraka-bank:latest
+            salmahamdi/albaraka-bank:${{ github.sha }}
