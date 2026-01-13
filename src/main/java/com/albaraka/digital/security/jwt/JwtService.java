@@ -7,6 +7,9 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+import org.springframework.security.core.GrantedAuthority;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import java.security.Key;
 import java.util.Date;
@@ -30,8 +33,15 @@ public class JwtService {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + jwtExpirationMs);
 
+        // Extraire les rôles à partir des authorities Spring (ROLE_CLIENT, ROLE_AGENT_BANCAIRE, ...)
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .map(auth -> auth.startsWith("ROLE_") ? auth.substring(5) : auth)
+                .collect(Collectors.toList());
+
         return Jwts.builder()
                 .setSubject(userDetails.getUsername())
+                .claim("roles", roles)
                 .setIssuedAt(now)
                 .setExpiration(expiry)
                 .signWith(signingKey, SignatureAlgorithm.HS256)
