@@ -11,6 +11,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -20,7 +21,14 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
+
 @Configuration
+@EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -49,16 +57,15 @@ public class SecurityConfig {
     @Order(1)
     public SecurityFilterChain oauth2FilterChain(HttpSecurity http) throws Exception {
         http
-                // Cette chaîne ne s’applique qu’à cette route précise
                 .securityMatcher("/api/agent/operations/pending")
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm ->
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // On restreint ici à GET + scope
                         .requestMatchers(HttpMethod.GET, "/api/agent/operations/pending")
                         .hasAuthority("SCOPE_operations.read")
-                        .anyRequest().denyAll() // sécurité: tout le reste sur ce matcher est refusé
+                        .anyRequest().denyAll()
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint)
@@ -70,44 +77,51 @@ public class SecurityConfig {
 
         return http.build();
     }
+
     /**
      * Chaîne 2 : JWT interne
-     * - Pour toutes les autres routes
+     * - Pour /auth/** et /api/**
      * - Utilise JwtAuthenticationFilter + rôles (CLIENT, AGENT_BANCAIRE, ADMIN)
      */
-        @Bean
-        @Order(2)
-        public SecurityFilterChain jwtFilterChain(HttpSecurity http) throws Exception {
+    @Bean
+    @Order(2)
+    public SecurityFilterChain jwtFilterChain(HttpSecurity http) throws Exception {
         http
-                .securityMatcher("/auth/**", "/api/**")  
+                .securityMatcher("/auth/**", "/api/**")
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm ->
                         sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
+                        // Préflight CORS
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/client/**").hasRole("CLIENT")
                         .requestMatchers("/api/agent/**").hasRole("AGENT_BANCAIRE")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler)
-                )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                );
 
         return http.build();
-        }
-        
-        @Bean
-        @Order(3)
-        public SecurityFilterChain uiFilterChain(HttpSecurity http) throws Exception {
+    }
+
+    /**
+     * Chaîne 3 : UI (Thymeleaf, form login)
+     */
+    @Bean
+    @Order(3)
+    public SecurityFilterChain uiFilterChain(HttpSecurity http) throws Exception {
         http
-                // Cette chaîne s’applique aux routes UI (non /api/**)
-                .securityMatcher("/login", "/logout", "/post-login", "/client/**", "/agent/**", "/admin/**")
+                .securityMatcher("/**")
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/logout").permitAll()
+                        .requestMatchers("/", "/home", "/auth/signup", "/signup", "/css/**", "/js/**").permitAll()
                         .requestMatchers("/client/**").hasRole("CLIENT")
                         .requestMatchers("/agent/**").hasRole("AGENT_BANCAIRE")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
@@ -115,12 +129,10 @@ public class SecurityConfig {
                 )
                 .formLogin(form -> form
                         .loginPage("/login")
-                        .loginProcessingUrl("/login")
-                        .defaultSuccessUrl("/post-login", true)
-                        .failureUrl("/login?error=true")
+                        .defaultSuccessUrl("/client/home", true)
                         .permitAll()
                 )
-                .rememberMe(rm -> rm
+                .rememberMe(rememberMe -> rememberMe
                         .key("change-remember-me-key")
                         .rememberMeParameter("remember-me")
                         .tokenValiditySeconds(7 * 24 * 60 * 60)
@@ -134,15 +146,29 @@ public class SecurityConfig {
                 );
 
         return http.build();
-        }
+    }
+
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
         grantedAuthoritiesConverter.setAuthorityPrefix("SCOPE_");
-        grantedAuthoritiesConverter.setAuthoritiesClaimName("scope"); 
+        grantedAuthoritiesConverter.setAuthoritiesClaimName("scope");
 
         JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
         jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
         return jwtAuthenticationConverter;
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of("http://localhost:4200"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
 }
