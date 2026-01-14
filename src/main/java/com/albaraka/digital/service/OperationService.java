@@ -27,6 +27,8 @@ public class OperationService {
     private final AccountService accountService;
     private final AccountRepository accountRepository;
     private final OperationRepository operationRepository;
+    private final DocumentService documentService;
+    
 
     @Transactional
     public Operation createClientOperation(OperationRequest request) {
@@ -120,9 +122,14 @@ public class OperationService {
     public Operation approveOperation(Long operationId) {
         Operation op = operationRepository.findById(operationId)
                 .orElseThrow(() -> new IllegalArgumentException("Opération introuvable"));
-
         if (op.getStatus() != OperationStatus.PENDING) {
             throw new IllegalArgumentException("Seules les opérations PENDING peuvent être approuvées");
+        }
+        // vérifier la présence d'au moins un justificatif
+        if (documentService.getDocumentsForOperation(operationId).isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Un justificatif est obligatoire pour approuver cette opération"
+            );
         }
 
         Account source = op.getAccountSource();
