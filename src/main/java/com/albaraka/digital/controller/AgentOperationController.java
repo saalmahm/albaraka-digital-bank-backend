@@ -14,8 +14,24 @@ public class AgentOperationController {
 
     private final OperationService operationService;
 
+    /**
+     * Endpoint 1 : PENDING via OAuth2 / Keycloak
+     * - Protégé par la SecurityFilterChain OAuth2 (scope SCOPE_operations.read)
+     */
     @GetMapping("/pending")
-    public Page<Operation> listPending(
+    public Page<Operation> listPendingOAuth2(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return operationService.listPendingOperations(PageRequest.of(page, size));
+    }
+
+    /**
+     * Endpoint 2 : PENDING via JWT interne
+     * - Protégé par la SecurityFilterChain JWT (rôle AGENT_BANCAIRE)
+     */
+    @GetMapping("/jwt/pending")
+    public Page<Operation> listPendingJwt(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
