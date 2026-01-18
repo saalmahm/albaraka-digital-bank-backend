@@ -11,6 +11,8 @@ import com.albaraka.digital.dto.admin.AdminUserSummary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
@@ -47,5 +49,14 @@ public class AdminUserController {
     @DeleteMapping("/{id}")
     public void deactivateUser(@PathVariable Long id) {
         adminUserService.deactivateUser(id);
+    }
+
+    @PutMapping("/{id}/roles")
+    public AdminCreateUserResponse updateRole(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body
+    ) {
+        String roleName = body.get("role"); // "CLIENT", "AGENT_BANCAIRE", "ADMIN"
+        return adminUserService.updateUserRole(id, roleName);
     }
 }

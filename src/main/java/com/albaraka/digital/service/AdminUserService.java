@@ -127,4 +127,28 @@ public class AdminUserService {
         user.setActive(false);
         userRepository.save(user);
     }
+
+    public AdminCreateUserResponse updateUserRole(Long userId, String roleName) {
+    User user = userRepository.findById(userId)
+            .orElseThrow(() -> new IllegalArgumentException("Utilisateur introuvable"));
+
+    UserRole role;
+    try {
+        role = UserRole.valueOf(roleName);
+    } catch (IllegalArgumentException e) {
+        throw new IllegalArgumentException("Rôle invalide: " + roleName);
+    }
+
+    user.setRole(role);
+    User saved = userRepository.save(user);
+
+    return new AdminCreateUserResponse(
+            saved.getId(),
+            saved.getEmail(),
+            saved.getFullName(),
+            saved.getRole(),
+            saved.isActive(),
+            null
+    );
+}
 }
